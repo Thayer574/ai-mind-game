@@ -1,51 +1,74 @@
 import random
+from weapons import PERKS_BY_RARITY
 
 class UpgradeManager:
     def __init__(self):
-        self.upgrade_pool = [
-            {"id": "fire_rate", "name": "Rapid Fire", "desc": "+20% Fire Rate", "type": "weapon"},
-            {"id": "damage", "name": "Heavy Rounds", "desc": "+25% Damage", "type": "weapon"},
-            {"id": "spread", "name": "Match Grade", "desc": "-30% Spread", "type": "weapon"},
-            {"id": "reload", "name": "Quick Hands", "desc": "-25% Reload Time", "type": "weapon"},
-            {"id": "speed", "name": "Lightweight", "desc": "+15% Movement Speed", "type": "player"},
-            {"id": "hp", "name": "Nano Armor", "desc": "+1 Max HP", "type": "player"},
-            {"id": "lifesteal", "name": "Siphon", "desc": "Heal 0.2 HP on hit", "type": "special"},
-            {"id": "dodge", "name": "Blur", "desc": "10% chance to dodge bullets", "type": "special"}
-        ]
-        self.active_upgrades = []
+        self.currency = 0
+        self.perks_owned = []
+        self.rarity_weights = {
+            "common": 0.70,
+            "rare": 0.20,
+            "epic": 0.07,
+            "legendary": 0.03
+        }
 
-    def get_random_upgrades(self, count=3):
-        return random.sample(self.upgrade_pool, min(count, len(self.upgrade_pool)))
+    def get_random_perks(self, count=3):
+        selected_perks = []
+        for _ in range(count):
+            r = random.random()
+            if r < self.rarity_weights["legendary"]:
+                rarity = "legendary"
+            elif r < self.rarity_weights["legendary"] + self.rarity_weights["epic"]:
+                rarity = "epic"
+            elif r < self.rarity_weights["legendary"] + self.rarity_weights["epic"] + self.rarity_weights["rare"]:
+                rarity = "rare"
+            else:
+                rarity = "common"
+            
+            available = [p for p in PERKS_BY_RARITY[rarity] if p not in selected_perks]
+            if not available:
+                available = [p for p in PERKS_BY_RARITY["common"] if p not in selected_perks]
+                
+            if available:
+                selected_perks.append(random.choice(available))
+        return selected_perks
 
-    def apply_upgrade(self, player, upgrade):
-        self.active_upgrades.append(upgrade)
-        uid = upgrade["id"]
-        
-        if uid == "fire_rate":
-            player.stats["fire_rate"] *= 0.8
-        elif uid == "damage":
-            player.stats["damage"] *= 1.25
-        elif uid == "spread":
-            player.stats["spread"] *= 0.7
-        elif uid == "reload":
-            player.stats["reload_time"] *= 0.75
-        elif uid == "speed":
-            player.base_speed *= 1.15
-        elif uid == "hp":
-            player.hp_max += 1
-            player.hp += 1
-        # Lifesteal and dodge are handled in the main game loop check
-        
-    def check_dodge(self):
-        dodge_chance = 0
-        for u in self.active_upgrades:
-            if u["id"] == "dodge":
-                dodge_chance += 0.1
-        return random.random() < dodge_chance
+    def apply_perk(self, player, perk):
+        self.perks_owned.append(perk["id"])
+        # Immediate stat changes
+        if perk["id"] == "quick_reload":
+            for slot in ["primary", "secondary"]:
+                player.weapons[slot]["stats"]["reload_time"] *= 0.75
+        elif perk["id"] == "scope":
+            for slot in ["primary", "secondary"]:
+                player.weapons[slot]["stats"]["range"] *= 1.5
+        elif perk["id"] == "switch":
+            for slot in ["primary", "secondary"]:
+                player.weapons[slot]["stats"]["is_auto"] = True
+                player.weapons[slot]["stats"]["fire_rate"] *= 0.8
+        elif perk["id"] == "akimbo":
+            player.weapons["primary"]["stats"]["spread"] *= 1.5
+
+    def has_perk(self, perk_id):
+        return perk_id in self.perks_owned
 
     def get_lifesteal(self):
-        lifesteal = 0
-        for u in self.active_upgrades:
-            if u["id"] == "lifesteal":
-                lifesteal += 0.2
-        return lifesteal
+        # Even if lifesteal isn't a current perk, we provide this to avoid AttributeError
+        return 0
+
+    def get_damage_reduction(self):
+        return 0.15 if self.has_perk("iron_will") else 0.0
+
+    def check_bandage(self, player):
+        if self.has_perk("bandage") and player.hp < player.hp_max * 0.25:
+            player.hp = player.hp_max * 0.6
+            return True
+        return False
+
+    def check_dodge(self):
+        # Provided for backward compatibility
+        return False
+
+    def check_scavenger(self, player):
+        # Provided for backward compatibility
+        pass

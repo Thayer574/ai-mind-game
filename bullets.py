@@ -15,7 +15,7 @@ class Bullet:
         self.distance_traveled = 0
         self.alive = True
 
-    def update(self, obstacles):
+    def update(self, obstacles, ricochet=False):
         # Move bullet
         dx = math.cos(math.radians(self.angle)) * self.speed
         dy = math.sin(math.radians(self.angle)) * self.speed
@@ -32,8 +32,19 @@ class Bullet:
         bullet_rect = pygame.Rect(self.x - self.size, self.y - self.size, self.size * 2, self.size * 2)
         for obstacle in obstacles:
             if bullet_rect.colliderect(obstacle):
-                self.alive = False
-                return True # Hit a wall
+                if ricochet:
+                    # Simple ricochet: reflect angle
+                    if bullet_rect.left <= obstacle.left or bullet_rect.right >= obstacle.right:
+                        self.angle = 180 - self.angle
+                    else:
+                        self.angle = -self.angle
+                    # Move out of obstacle
+                    self.x += math.cos(math.radians(self.angle)) * self.speed
+                    self.y += math.sin(math.radians(self.angle)) * self.speed
+                    return True
+                else:
+                    self.alive = False
+                    return True # Hit a wall
         return False
 
     def draw(self, screen):
